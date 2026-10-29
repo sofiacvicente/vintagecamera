@@ -1,9 +1,9 @@
 // Rolo — service worker: a app funciona offline depois da primeira visita.
 // Quando mudares o index.html, sobe a versão para os telemóveis apanharem a nova.
-const CACHE = 'rolo-v1';
+const CACHE = 'rolo-v2';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
-  './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png'
+  './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon.svg'
 ];
 
 self.addEventListener('install', e => {
