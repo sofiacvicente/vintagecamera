@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0e0d0c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rolo">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Rolo — câmara com filtros</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e0d0c; --panel:#171513; --ink:#efe8dc; --mute:#8b8378; --line:#2b2824;
+  --acc:#ff7a1a; --mono:"Space Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--mono);overflow:hidden;
+  -webkit-user-select:none;user-select:none;overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+#app{position:fixed;inset:0;display:grid;
+  grid-template-rows:auto 1fr auto auto auto;
+  grid-template-areas:"top" "stage" "modes" "chips" "bottom";
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.top{grid-area:top;height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 12px}
+.ibtn{width:44px;height:44px;display:grid;place-items:center;border-radius:22px;position:relative}
+.ibtn svg{width:24px;height:24px;stroke:var(--ink);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ibtn:active{background:#ffffff14}
+.ibtn .tag{position:absolute;right:5px;bottom:7px;font-size:9px;font-weight:700;line-height:1}
+.ibtn.off svg{stroke:var(--mute)}
+.ibtn.on svg{stroke:#ffd25a}
+.date-btn{height:30px;padding:0 10px;border:1px solid var(--line);border-radius:15px;font-size:11px;letter-spacing:.12em;color:var(--mute)}
+.date-btn.on{color:var(--acc);border-color:#ff7a1a66;text-shadow:0 0 8px #ff7a1a88}
+.counter{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--mute);letter-spacing:.1em}
+.counter b{display:inline-block;min-width:34px;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:#000;
+  color:var(--ink);font-size:14px;text-align:center;letter-spacing:.08em}
+.stage{grid-area:stage;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;padding:0 10px}
+#frame{position:relative;overflow:hidden;background:#000;border-radius:3px;touch-action:none;box-shadow:0 0 0 1px #ffffff10}
+#view{display:block;width:100%;height:100%}
+#stampLayer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#blink{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .12s}
+#blink.on{opacity:1;transition:none}
+.fname{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:26px;font-weight:700;letter-spacing:.18em;
+  color:#fff;text-shadow:0 2px 18px #000a;opacity:0;transition:opacity .35s;pointer-events:none;white-space:nowrap;text-align:center}
+.fname small{display:block;font-size:11px;font-weight:400;letter-spacing:.12em;opacity:.85;margin-top:4px}
+.fname.show{opacity:1;transition:none}
+.ev{position:absolute;left:50%;top:12px;transform:translateX(-50%);padding:4px 10px;border-radius:12px;background:#000a;font-size:12px;
+  opacity:0;transition:opacity .4s;pointer-events:none}
+.ev.show{opacity:1;transition:none}
+.fallback{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  padding:24px;text-align:center;color:var(--mute);font-size:13px;line-height:1.5}
+.fallback.show{display:flex}
+.fallback h2{margin:0;color:var(--ink);font-size:15px;letter-spacing:.08em}
+.fallback .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.pill{padding:11px 16px;border-radius:22px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:12px;letter-spacing:.08em}
+.pill.primary{background:var(--ink);color:#111;border-color:var(--ink)}
+.modes{grid-area:modes;display:flex;justify-content:center;gap:26px;padding:12px 0 4px;font-size:11px;letter-spacing:.2em}
+.modes button{color:var(--mute);padding:4px 2px;border-bottom:2px solid transparent}
+.modes button.sel{color:var(--ink);border-color:var(--acc)}
+.chips{grid-area:chips;display:flex;gap:7px;overflow-x:auto;padding:10px 12px 6px;scrollbar-width:none}
+.chips > :first-child{margin-left:auto}
+.chips > :last-child{margin-right:auto}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:6px 11px 6px 6px;border-radius:20px;border:1px solid var(--line);background:var(--panel);text-align:left}
+.chip .sw{width:24px;height:24px;border-radius:50%;flex:0 0 auto;box-shadow:inset 0 0 0 1px #ffffff22}
+.chip .t{font-size:11.5px;font-weight:700;letter-spacing:.08em;line-height:1.1}
+.chip .r{font-size:9px;color:var(--mute);letter-spacing:.04em;line-height:1.2}
+.chip.sel{background:var(--ink);border-color:var(--ink);color:#141210}
+.chip.sel .r{color:#5a544c}
+.bottom{grid-area:bottom;height:112px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 22px}
+.thumb{width:52px;height:52px;border-radius:8px;border:1px solid var(--line);background:#000 center/cover no-repeat;justify-self:start;overflow:hidden}
+.thumb.pop{animation:pop .45s ease}
+@keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+.shutter{width:76px;height:76px;border-radius:50%;border:3px solid var(--ink);display:grid;place-items:center;position:relative}
+.shutter::after{content:"";width:60px;height:60px;border-radius:50%;background:var(--ink);transition:transform .12s, background .2s}
+.shutter:active::after{transform:scale(.88)}
+.shutter.develop::after{background:var(--acc)}
+.shutter .lbl{position:absolute;bottom:-20px;font-size:9px;letter-spacing:.18em;color:var(--mute);white-space:nowrap}
+.side{position:relative;justify-self:start}
+.side.r{justify-self:end}
+.slbl{position:absolute;top:calc(100% + 19px);left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:.16em;color:var(--mute);white-space:nowrap;pointer-events:none}
+.gal{width:52px;height:52px;border-radius:8px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center}
+.gal svg{width:24px;height:24px;stroke:var(--ink);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.gal:active{background:#ffffff14}
+.topr{display:flex}
+#screenFlash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:50;transition:opacity .25s}
+#screenFlash.on{opacity:1;transition:none}
+.toast{position:fixed;left:50%;top:calc(62px + env(safe-area-inset-top));transform:translateX(-50%) translateY(-10px);
+  background:#000d;border:1px solid var(--line);padding:9px 14px;border-radius:18px;font-size:12px;opacity:0;transition:.3s;z-index:60;
+  pointer-events:none;max-width:86vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* viewer */
+.viewer{position:fixed;inset:0;background:#000;z-index:40;display:none;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.viewer.show{display:flex}
+.vtop{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:11px;letter-spacing:.1em;color:var(--mute)}
+.vimg{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px;touch-action:pan-y}
+.vimg img{max-width:100%;max-height:100%;object-fit:contain;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto;box-shadow:0 0 0 1px #ffffff14}
+.vbar{height:84px;display:flex;align-items:center;justify-content:center;gap:10px;padding:0 12px}
+.hint{font-size:11px;color:var(--mute);text-align:center;padding:0 20px 8px;min-height:18px}
+.vid{position:absolute;width:2px;height:2px;opacity:0;pointer-events:none;left:0;top:0}
+@media (orientation:landscape) and (max-height:560px){
+  #app{grid-template-columns:1fr 210px;grid-template-rows:auto 1fr auto auto;
+    grid-template-areas:"stage top" "stage chips" "stage modes" "stage bottom"}
+  .top{height:48px}
+  .chips{flex-direction:column;overflow-y:auto;overflow-x:hidden;justify-content:flex-start;align-items:stretch;padding:6px 10px}
+  .chips > :first-child, .chips > :last-child{margin:0}
+  .modes{padding:6px 0}
+  .bottom{height:96px;padding:0 12px}
+  .stage{padding:10px}
+}
+</style>
+</head>
+<body>
+<video id="video" class="vid" playsinline muted autoplay></video>
+<div id="app">
+  <div class="top">
+    <button class="ibtn" id="flashBtn" aria-label="Flash">
+      <svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L10 22l9-12h-6.5z"/></svg><span class="tag" id="flashTag">A</span>
+    </button>
+    <div class="counter"><b id="count">00</b></div>
+    <button class="date-btn" id="dateBtn" aria-label="Carimbo de data">DATA</button>
+    <div class="topr">
+      <button class="ibtn" id="backBtn" aria-label="Voltar à câmara" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <button class="ibtn" id="flipBtn" aria-label="Trocar câmara">
+        <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><path d="M9.5 13.5a3 3 0 0 0 5 1.5M14.5 12.5a3 3 0 0 0-5-1.5"/><path d="M15 16v-1.5h-1.5M9 10v1.5h1.5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div id="frame">
+      <canvas id="view"></canvas>
+      <canvas id="stampLayer"></canvas>
+      <div id="blink"></div>
+      <div class="fname" id="fname"></div>
+      <div class="ev" id="evPill">±0.0 EV</div>
+    </div>
+    <div class="fallback" id="fallback">
+      <h2>SEM VISOR AO VIVO</h2>
+      <div id="fbMsg">Não foi possível abrir a câmara aqui.</div>
+      <div class="row">
+        <button class="pill primary" id="fbShoot">Tirar foto</button>
+        <button class="pill" id="fbPick">Escolher da galeria</button>
+      </div>
+      <div style="font-size:11px;max-width:300px">Tira a foto com a câmara do telemóvel e o filtro é aplicado a seguir. Para o visor ao vivo, abre a app num endereço próprio (https).</div>
+    </div>
+  </div>
+
+  <div class="modes" id="modes">
+    <button data-mode="dia">☀ DIA</button>
+    <button data-mode="noite">☾ NOITE</button>
+  </div>
+  <div class="chips" id="chips"></div>
+
+  <div class="bottom">
+    <div class="side"><button class="thumb" id="thumb" aria-label="Ver rolo"></button><span class="slbl">ROLO</span></div>
+    <button class="shutter" id="shutter" aria-label="Disparar"><span class="lbl" id="shutterLbl"></span></button>
+    <div class="side r"><button class="gal" id="importBtn" aria-label="Escolher fotos da galeria"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg></button><span class="slbl">GALERIA</span></div>
+  </div>
+</div>
+
+<div class="viewer" id="viewer">
+  <div class="vtop">
+    <button class="ibtn" id="vClose" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <span id="vInfo"></span>
+    <button class="ibtn" id="vDel" aria-label="Apagar"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+  </div>
+  <div class="vimg" id="vImgWrap"><img id="vImg" alt="Foto"></div>
+  <div class="hint" id="vHint"></div>
+  <div class="vbar">
+    <button class="ibtn" id="vPrev" aria-label="Anterior"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <button class="pill primary" id="vSave">Guardar / partilhar</button>
+    <button class="ibtn" id="vNext" aria-label="Seguinte"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+  </div>
+</div>
+
+<div id="screenFlash"></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="filePick" accept="image/*" multiple hidden>
+
+<script>
+"use strict";
+/* ============================================================
+   FILTROS
+   Cada filtro é só um conjunto de números que o shader usa.
+   ============================================================ */
+const BASE = {
+  exposure:0, temp:0, tint:0, sat:1, curve:0, contrast:0, crush:0, shoulder:1,
+  mix:[1,0,0, 0,1,0, 0,0,1],            // mistura de canais (linha = canal de saída)
+  black:[0,0,0], white:[1,1,1],         // "base do filme": pretos levantados / brancos baixos
+  sh:[0,0,0], hi:[0,0,0],               // tom das sombras / dos realces (split toning)
+  grain:0, grainSize:1, chroma:0,       // grão (quantidade, tamanho, parte colorida)
+  vignette:0, corner:0, soft:0, sharpen:0,
+  bloom:0, halation:0, haloColor:[1,0.25,0.08], haloThresh:0.72,
+  flash:0, flashGain:0, flashDark:0, flashSize:0.6, flashTint:[1,1,1]
+};
+// flash simulado usado quando ligas o flash num filtro de dia
+const GENERIC_FLASH = {flash:0.65, flashGain:0.4, flashDark:0.45, flashSize:0.62, flashTint:[1,1,1.02]};
+
+const FILTERS = [
+  { id:'azul', name:'Azul', ref:'Superia 400', mode:'dia', aspect:3/2,
+    sw:['#0b3aa8','#3d8fe2','#c4e6f6'],
+    p:{exposure:0.2, temp:-0.03, sat:1.32, curve:0.12,
+       mix:[1.04,-0.04,0.0, -0.02,0.98,0.06, -0.01,-0.04,1.05],
+       black:[0.035,0.07,0.15], white:[0.93,0.915,0.955], sh:[-0.01,0,0.03], hi:[-0.015,0.005,0.012],
+       grain:0.045, grainSize:1.2, chroma:0.25, soft:0.2, bloom:0.06, vignette:0.04}},
+  { id:'pinhal', name:'Pinhal', ref:'instant', mode:'dia', aspect:4/3,
+    sw:['#5b4a2e','#c9a46a','#e8dccb'],
+    p:{exposure:0.05, temp:0.06, tint:-0.01, sat:0.78, curve:0.06, contrast:-0.04,
+       black:[0.10,0.065,0.03], white:[0.90,0.875,0.86], sh:[0.02,0.006,-0.01], hi:[0,0,0.01],
+       grain:0.065, grainSize:1.5, chroma:0.3, soft:0.5, bloom:0.12, vignette:0.15, corner:0.6}},
+  { id:'ouro', name:'Ouro', ref:'Gold 200', mode:'dia', aspect:3/2,
+    sw:['#7a3f12','#f0a43a','#fbe7b8'],
+    p:{exposure:0.15, temp:0.07, sat:1.12, curve:0.14,
+       mix:[1.03,0,-0.03, 0,1,0, 0,0.03,0.97],
+       black:[0.05,0.04,0.03], white:[0.975,0.935,0.84], sh:[0.01,0,-0.012], hi:[0.02,0.008,-0.03],
+       grain:0.05, grainSize:1.3, chroma:0.2, soft:0.15, bloom:0.1, halation:0.06, vignette:0.12}},
+  { id:'dispo', name:'Dispo', ref:'descartável', mode:'noite', aspect:3/2, flashAuto:true,
+    sw:['#2b2a2f','#9fb3c8','#efe9e0'],
+    p:{exposure:0.2, temp:-0.05, sat:0.86, curve:0.1,
+       black:[0.11,0.085,0.05], white:[0.96,0.95,0.955], sh:[0.03,0,-0.03], hi:[-0.01,0,0.015],
+       grain:0.11, grainSize:1.7, chroma:0.35, soft:0.35, bloom:0.14, vignette:0.22,
+       flash:0.8, flashGain:0.45, flashDark:0.4, flashSize:0.62, flashTint:[0.99,1,1.03]}},
+  { id:'digicam', name:'Digicam', ref:'CCD 2000s', mode:'noite', aspect:4/3, cap:2304, flashAuto:true,
+    sw:['#050505','#c27a52','#ffe2c4'],
+    p:{exposure:0.1, temp:0.09, tint:-0.015, sat:1.15, curve:0.25, contrast:0.1, crush:0.07, shoulder:0,
+       white:[1,0.975,0.95], sharpen:0.6, grain:0.035, chroma:0.8, bloom:0.12, vignette:0.08,
+       flash:1, flashGain:0.7, flashDark:0.82, flashSize:0.5, flashTint:[1.02,1,0.97]}},
+  { id:'neon', name:'Néon', ref:'800T', mode:'noite', aspect:3/2,
+    sw:['#0d2c33','#3c8a8f','#ff5a2a'],
+    p:{exposure:0.25, temp:-0.1, tint:-0.02, sat:1.1, curve:0.15,
+       black:[0.03,0.06,0.075], white:[0.98,0.955,0.93], sh:[-0.02,0.018,0.03], hi:[0.015,0,-0.01],
+       halation:0.7, haloColor:[1,0.2,0.05], haloThresh:0.9, bloom:0.12,
+       grain:0.08, grainSize:1.6, chroma:0.3, soft:0.2, vignette:0.12}},
+];
+FILTERS.forEach(f => f.P = Object.assign({}, BASE, f.p));
+
+/* ============================================================
+   SHADERS (WebGL2)
+   ============================================================ */
+const VS = `#version 300 es
+out vec2 vUv;
+void main(){
+  vec2 p = vec2(gl_VertexID == 1 ? 3.0 : -1.0, gl_VertexID == 2 ? 3.0 : -1.0);
+  vUv = p * 0.5 + 0.5;
+  gl_Position = vec4(p, 0.0, 1.0);
+}`;
+
+// passo 1: só as luzes fortes, numa textura pequena (para halo / bloom)
+const FS_HI = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uSrc; uniform vec4 uCrop; uniform float uMirror, uLodDown, uThr; uniform vec3 uGain;
+void main(){
+  vec2 uv = vec2(vUv.x, 1.0 - vUv.y);
+  if (uMirror > 0.5) uv.x = 1.0 - uv.x;
+  vec3 c = textureLod(uSrc, uCrop.xy + uv * uCrop.zw, uLodDown).rgb * uGain;
+  float m = max(c.r, max(c.g, c.b));
+  o = vec4(clamp(c * smoothstep(uThr, 1.0, m), 0.0, 1.0), 1.0);
+}`;
+
+// passo 2: o filtro completo
+const FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uSrc, uHiTex;
+uniform vec4 uCrop; uniform float uMirror; uniform vec2 uOut;
+uniform float uLod0, uTime;
+uniform float uExposure, uTemp, uTint, uSat, uCurve, uContrast, uCrush, uShoulder;
+uniform mat3 uMix;
+uniform vec3 uBlack, uWhite, uShTint, uHiTint;
+uniform float uGrain, uGrainSize, uChroma;
+uniform float uVignette, uCorner, uSoft, uSharpen, uBloom, uHalation;
+uniform vec3 uHaloColor;
+uniform float uFlash, uFlashGain, uFlashDark, uFlashSize;
+uniform vec3 uFlashTint;
+
+float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+uint hsh(uint x){ x ^= x >> 16u; x *= 0x7feb352du; x ^= x >> 15u; x *= 0x846ca68bu; x ^= x >> 16u; return x; }
+float rnd(vec2 p, float s){
+  uvec2 q = uvec2(ivec2(floor(p)) + ivec2(65536));
+  return float(hsh(q.x + hsh(q.y + hsh(uint(s) + 7u)))) * (1.0 / 4294967295.0);
+}
+float vnoise(vec2 p, float s){
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(rnd(i, s), rnd(i + vec2(1, 0), s), f.x), mix(rnd(i + vec2(0, 1), s), rnd(i + vec2(1, 1), s), f.x), f.y);
+}
+vec3 ring(vec2 uv, float r, float lod){
+  vec2 R = r * max(uOut.x, uOut.y) / uOut;
+  vec3 a = textureLod(uHiTex, uv, lod).rgb;
+  for (int i = 0; i < 8; i++){
+    float ang = float(i) * 0.7853982 + 0.3927;
+    a += textureLod(uHiTex, uv + vec2(cos(ang), sin(ang)) * R, lod).rgb;
+  }
+  return a / 9.0;
+}
+
+void main(){
+  vec2 uv = vec2(vUv.x, 1.0 - vUv.y);
+  if (uMirror > 0.5) uv.x = 1.0 - uv.x;
+  vec2 s = uCrop.xy + uv * uCrop.zw;
+
+  // lente: suavidade / nitidez exagerada
+  vec3 c = texture(uSrc, s).rgb;
+  vec3 b1 = textureLod(uSrc, s, uLod0 + 0.7).rgb;
+  c = mix(c, b1, uSoft);
+  c = max(c + (c - b1) * uSharpen, 0.0);
+
+  // exposição + balanço de brancos
+  c *= exp2(uExposure) * vec3(1.0 + uTemp, 1.0 - uTint, 1.0 - uTemp);
+
+  // flash direto simulado: centro estourado, fundo a cair para preto
+  vec2 asp = vec2(uOut.x / uOut.y, 1.0);
+  vec2 q = vUv - 0.5;
+  if (uFlash > 0.0){
+    // como um flash a sério: numa cena já clara quase não se nota, no escuro manda em tudo
+    float sceneL = luma(textureLod(uSrc, vec2(0.5), 14.0).rgb) * exp2(uExposure);
+    float fA = uFlash * clamp(1.5 - 2.2 * sceneL, 0.25, 1.0);
+    vec2 pc = (vUv - vec2(0.5, 0.56)) * asp;
+    float fd = length(pc) / (0.5 * length(asp));
+    float fall = exp(-(fd * fd) / (uFlashSize * uFlashSize));
+    c *= mix(1.0, mix(1.0 - uFlashDark, 1.0 + uFlashGain, fall), fA);
+    c = mix(c, c * uFlashTint, fA * fall);
+  }
+
+  // cor do "filme": mistura de canais + saturação
+  c = max(uMix * c, 0.0);
+  float l = luma(c);
+  c = max(vec3(l) + (c - vec3(l)) * uSat, 0.0);
+
+  // curva de contraste
+  c = (c - 0.5) * (1.0 + uContrast) + 0.5;
+  vec3 cc = clamp(c, 0.0, 1.0);
+  c = mix(c, cc * cc * (3.0 - 2.0 * cc), uCurve);
+  c = max(c - uCrush, 0.0) / (1.0 - uCrush);
+
+  // ombro dos realces (filme) vs. corte seco (digital)
+  const float K = 0.72;
+  vec3 ov = max(c - K, 0.0);
+  vec3 shl = mix(c, K + (1.0 - K) * (1.0 - exp(-ov / (1.0 - K))), step(vec3(K), c));
+  c = mix(clamp(c, 0.0, 1.0), shl, uShoulder);
+
+  // tons nas sombras e nos realces
+  l = clamp(luma(c), 0.0, 1.0);
+  c += uShTint * (1.0 - l) * (1.0 - l) + uHiTint * l * l;
+
+  // halo vermelho (halation) e brilho (bloom) à volta das luzes
+  if (uHalation + uBloom > 0.0){
+    vec3 glow = ring(vUv, 0.010, 2.0) * 0.6 + ring(vUv, 0.028, 3.3) * 0.4;
+    float gm = max(glow.r, max(glow.g, glow.b));
+    c += uHaloColor * gm * uHalation * 2.2;
+    c += glow * uBloom * 1.6;
+  }
+
+  // base do filme: pretos nunca pretos, brancos nunca brancos
+  c = clamp(c, 0.0, 1.0);
+  c = uBlack + c * (uWhite - uBlack);
+
+  // vinheta + cantos escuros arredondados
+  c *= 1.0 - uVignette * pow(length(q) * 1.41421, 2.2);
+  if (uCorner > 0.0){
+    vec2 p = abs(q) * uOut;
+    float R = 0.2 * min(uOut.x, uOut.y);
+    vec2 d = p - (uOut * 0.5 - R);
+    c *= 1.0 - uCorner * smoothstep(0.3, 1.3, length(max(d, 0.0)) / R);
+  }
+
+  // grão: mais forte nos meios-tons, um pouco de ruído de cor
+  l = luma(c);
+  float gs = max(uGrainSize * max(uOut.x, uOut.y) / 1500.0, 0.5);
+  vec2 gp = gl_FragCoord.xy / gs;
+  float t = floor(uTime);
+  float n = (vnoise(gp, t) + 0.5 * vnoise(gp * 2.07 + 13.1, t + 3.0)) / 1.5 - 0.5;
+  vec3 cn = vec3(vnoise(gp * 0.9 + 5.3, t + 7.0), vnoise(gp * 0.9 + 9.1, t + 11.0), vnoise(gp * 0.9 + 2.7, t + 17.0)) - 0.5;
+  float amp = 0.25 + 2.6 * l * (1.0 - l);
+  c += uGrain * amp * (vec3(n) * (1.0 - 0.5 * uChroma) + cn * uChroma * 1.4);
+  c += (rnd(gl_FragCoord.xy, t + 23.0) - 0.5) / 255.0;
+
+  o = vec4(clamp(c, 0.0, 1.0), 1.0);
+}`;
+
+/* ============================================================
+   RENDERER
+   ============================================================ */
+const HI_LONG = 512;
+class Renderer {
+  constructor(canvas, preserve){
+    this.canvas = canvas;
+    const gl = canvas.getContext('webgl2', {alpha:false, antialias:false, premultipliedAlpha:false, preserveDrawingBuffer:!!preserve});
+    if (!gl) throw new Error('Este browser não suporta WebGL2');
+    this.gl = gl;
+    this.prog = this.program(VS, FS);
+    this.progHi = this.program(VS, FS_HI);
+    this.vao = gl.createVertexArray();
+    this.u = this.locs(this.prog); this.uh = this.locs(this.progHi);
+    this.tex = this.mkTex();
+    this.hiTex = this.mkTex();
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 8, 8, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    this.fbo = gl.createFramebuffer();
+    this.hiW = 8; this.hiH = 8;
+  }
+  program(vs, fs){
+    const gl = this.gl, p = gl.createProgram();
+    for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]){
+      const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+      gl.attachShader(p, sh);
+    }
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  }
+  locs(p){
+    const gl = this.gl, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS), u = {};
+    for (let i = 0; i < n; i++){ const a = gl.getActiveUniform(p, i); u[a.name.replace('[0]','')] = gl.getUniformLocation(p, a.name); }
+    return u;
+  }
+  mkTex(){
+    const gl = this.gl, t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+  }
+  upload(src){
+    const gl = this.gl;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+    gl.generateMipmap(gl.TEXTURE_2D);
+  }
+  // o: {w,h,crop:[x,y,w,h],cropLong,mirror,seed,ev,flash,fired}
+  render(f, o){
+    const gl = this.gl, P = f.P;
+    let F = {flash:0, flashGain:0, flashDark:0, flashSize:0.6, flashTint:[1,1,1]};
+    if (o.flash) F = P.flash > 0 ? P : GENERIC_FLASH;
+    const flashAmt = o.flash ? F.flash * (o.fired ? 0.65 : 1) : 0;
+    const ev = P.exposure + (o.ev || 0);
+    const wb = [1 + P.temp, 1 - P.tint, 1 - P.temp].map(v => v * Math.pow(2, ev));
+    const needHi = P.halation + P.bloom > 0;
+
+    gl.bindVertexArray(this.vao);
+    if (needHi){
+      const k = HI_LONG / Math.max(o.w, o.h);
+      const hw = Math.max(8, Math.round(o.w * k)), hh = Math.max(8, Math.round(o.h * k));
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.hiTex);
+      if (hw !== this.hiW || hh !== this.hiH){
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, hw, hh, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        this.hiW = hw; this.hiH = hh;
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.hiTex, 0);
+      gl.viewport(0, 0, hw, hh);
+      gl.useProgram(this.progHi);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.tex);
+      const uh = this.uh;
+      gl.uniform1i(uh.uSrc, 0);
+      gl.uniform4fv(uh.uCrop, o.crop);
+      gl.uniform1f(uh.uMirror, o.mirror ? 1 : 0);
+      gl.uniform1f(uh.uLodDown, Math.max(0, Math.log2(o.cropLong / HI_LONG) - 1));
+      gl.uniform1f(uh.uThr, P.haloThresh);
+      gl.uniform3fv(uh.uGain, wb);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindTexture(gl.TEXTURE_2D, this.hiTex);
+      gl.generateMipmap(gl.TEXTURE_2D);
+    }
+
+    gl.viewport(0, 0, o.w, o.h);
+    gl.useProgram(this.prog);
+    const u = this.u;
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.hiTex);
+    gl.uniform1i(u.uSrc, 0); gl.uniform1i(u.uHiTex, 1);
+    gl.uniform4fv(u.uCrop, o.crop);
+    gl.uniform1f(u.uMirror, o.mirror ? 1 : 0);
+    gl.uniform2f(u.uOut, o.w, o.h);
+    gl.uniform1f(u.uLod0, Math.max(0, Math.log2(o.cropLong / 1000)));
+    gl.uniform1f(u.uTime, o.seed || 0);
+    gl.uniform1f(u.uExposure, ev);
+    gl.uniform1f(u.uTemp, P.temp); gl.uniform1f(u.uTint, P.tint);
+    gl.uniform1f(u.uSat, P.sat); gl.uniform1f(u.uCurve, P.curve); gl.uniform1f(u.uContrast, P.contrast);
+    gl.uniform1f(u.uCrush, P.crush); gl.uniform1f(u.uShoulder, P.shoulder);
+    gl.uniformMatrix3fv(u.uMix, true, P.mix);
+    gl.uniform3fv(u.uBlack, P.black); gl.uniform3fv(u.uWhite, P.white);
+    gl.uniform3fv(u.uShTint, P.sh); gl.uniform3fv(u.uHiTint, P.hi);
+    gl.uniform1f(u.uGrain, P.grain); gl.uniform1f(u.uGrainSize, P.grainSize); gl.uniform1f(u.uChroma, P.chroma);
+    gl.uniform1f(u.uVignette, P.vignette); gl.uniform1f(u.uCorner, P.corner);
+    gl.uniform1f(u.uSoft, P.soft); gl.uniform1f(u.uSharpen, P.sharpen);
+    gl.uniform1f(u.uBloom, needHi ? P.bloom : 0); gl.uniform1f(u.uHalation, needHi ? P.halation : 0);
+    gl.uniform3fv(u.uHaloColor, P.haloColor);
+    gl.uniform1f(u.uFlash, flashAmt);
+    gl.uniform1f(u.uFlashGain, F.flashGain); gl.uniform1f(u.uFlashDark, F.flashDark);
+    gl.uniform1f(u.uFlashSize, F.flashSize); gl.uniform3fv(u.uFlashTint, F.flashTint);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+}
+
+/* ============================================================
+   CARIMBO DE DATA (7 segmentos, laranja)
+   ============================================================ */
+const SEG = {'0':'abcdef','1':'bc','2':'abged','3':'abgcd','4':'fgbc','5':'afgcd','6':'afgedc','7':'abc','8':'abcdefg','9':'abcdfg'};
+function stampText(d){
+  const p = n => String(n).padStart(2, '0');
+  return `'${p(d.getFullYear() % 100)} ${p(d.getMonth() + 1)} ${p(d.getDate())}`;
+}
+function drawStamp(ctx, w, h, date){
+  const H = Math.max(10, Math.round(Math.min(w, h) * 0.042));
+  const W = H * 0.52, T = Math.max(1.5, H * 0.13), gap = H * 0.30;
+  const txt = stampText(date);
+  let total = 0;
+  for (const ch of txt) total += ch === ' ' ? gap : ch === "'" ? H * 0.22 : W + gap;
+  const x0 = w - total - Math.min(w, h) * 0.06, y0 = h - H - Math.min(w, h) * 0.055;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round'; ctx.lineWidth = T;
+  const pass = (color, blur, alpha) => {
+    ctx.strokeStyle = color; ctx.shadowColor = '#ff6a10'; ctx.shadowBlur = blur; ctx.globalAlpha = alpha;
+    let x = x0;
+    for (const ch of txt){
+      if (ch === ' '){ x += gap; continue; }
+      ctx.setTransform(1, 0, -0.12, 1, 0.12 * (y0 + H), 0);
+      ctx.beginPath();
+      if (ch === "'"){ ctx.moveTo(x + H * 0.08, y0 + T * 0.6); ctx.lineTo(x + H * 0.04, y0 + H * 0.24); x += H * 0.22; ctx.stroke(); continue; }
+      const L = x, R = x + W, Tp = y0, M = y0 + H / 2, B = y0 + H, e = T * 0.75;
+      const segs = {a:[L+e,Tp,R-e,Tp], b:[R,Tp+e,R,M-e], c:[R,M+e,R,B-e], d:[L+e,B,R-e,B], e:[L,M+e,L,B-e], f:[L,Tp+e,L,M-e], g:[L+e,M,R-e,M]};
+      for (const s of SEG[ch]){ const [ax, ay, bx, by] = segs[s]; ctx.moveTo(ax, ay); ctx.lineTo(bx, by); }
+      ctx.stroke();
+      x += W + gap;
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  };
+  pass('#ff5a10', H * 0.9, 0.55);
+  pass('#ff8a2a', H * 0.25, 0.9);
+  pass('#ffc890', 0, 0.35);
+  ctx.restore();
+}
+
+/* ============================================================
+   ROLO (fotos guardadas no telemóvel, IndexedDB)
+   ============================================================ */
+const Roll = {
+  list: [], db: null, urls: new Map(),
+  async init(){
+    try {
+      this.db = await new Promise((res, rej) => {
+        const r = indexedDB.open('rolo', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('photos', {keyPath:'id'});
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+      });
+      this.list = await new Promise((res, rej) => {
+        const q = this.db.transaction('photos').objectStore('photos').getAll();
+        q.onsuccess = () => res(q.result || []); q.onerror = () => rej(q.error);
+      });
+    } catch (e){ this.db = null; this.list = []; }
+    this.list.sort((a, b) => a.id - b.id);
+  },
+  tx(mode, fn){
+    if (!this.db) return Promise.resolve();
+    return new Promise(res => {
+      try { const t = this.db.transaction('photos', mode); fn(t.objectStore('photos')); t.oncomplete = res; t.onerror = res; }
+      catch (e){ res(); }
+    });
+  },
+  async add(r){ this.list.push(r); await this.tx('readwrite', s => s.put(r)); },
+  async del(id){
+    this.list = this.list.filter(r => r.id !== id);
+    if (this.urls.has(id)){ URL.revokeObjectURL(this.urls.get(id)); this.urls.delete(id); }
+    await this.tx('readwrite', s => s.delete(id));
+  },
+  url(r){ if (!this.urls.has(r.id)) this.urls.set(r.id, URL.createObjectURL(r.blob)); return this.urls.get(r.id); }
+};
+
+/* ============================================================
+   APP
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const video = $('video'), frame = $('frame'), view = $('view'), stampLayer = $('stampLayer');
+const FRAMED = (() => { try { return window.self !== window.top; } catch (e){ return true; } })();
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('rolo.' + k); return v === null ? d : JSON.parse(v); } catch (e){ return d; } },
+  set(k, v){ try { localStorage.setItem('rolo.' + k, JSON.stringify(v)); } catch (e){} }
+};
+const hour = new Date().getHours();
+const state = {
+  mode: (hour >= 20 || hour < 7) ? 'noite' : 'dia',
+  filter: null, flash: store.get('flash', 'auto'), stamp: store.get('stamp', true),
+  ev: 0, facing: 'environment', source: 'none',   // 'camera' | 'image' | 'none'
+  image: null, imageDirty: false, cameraOK: false, busy: false, queue: [], qTotal: 0, qIndex: 0,
+  vw: 0, vh: 0, frameKey: ''
+};
+state.filter = FILTERS.find(f => f.id === store.get('filter_' + state.mode, null) && f.mode === state.mode) || FILTERS.find(f => f.mode === state.mode);
+
+let previewR, captureR, stream = null, track = null, torchOK = false, frameNo = 0;
+const cur = () => state.filter;
+const flashOn = () => state.flash === 'on' || (state.flash === 'auto' && !!cur().flashAuto);
+
+function toast(msg, ms = 2400){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms);
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ---------- UI: modos e filtros ---------- */
+function renderModes(){
+  document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('sel', b.dataset.mode === state.mode));
+}
+function renderChips(){
+  const box = $('chips'); box.innerHTML = '';
+  for (const f of FILTERS.filter(f => f.mode === state.mode)){
+    const b = document.createElement('button');
+    b.className = 'chip' + (f === cur() ? ' sel' : '');
+    b.innerHTML = `<span class="sw" style="background:linear-gradient(135deg,${f.sw[0]},${f.sw[1]} 55%,${f.sw[2]})"></span><span><div class="t">${f.name.toUpperCase()}</div><div class="r">${f.ref}</div></span>`;
+    b.onclick = () => selectFilter(f);
+    box.appendChild(b);
+  }
+}
+function selectFilter(f, announce = true){
+  state.filter = f; store.set('filter_' + f.mode, f.id);
+  renderChips(); renderFlash(); layout(true); state.imageDirty = true;
+  if (announce){
+    const n = $('fname'); n.innerHTML = `${f.name.toUpperCase()}<small>${f.ref}</small>`;
+    n.classList.add('show'); clearTimeout(n._t); n._t = setTimeout(() => n.classList.remove('show'), 700);
+  }
+}
+function setMode(m){
+  if (m === state.mode) return;
+  state.mode = m; renderModes();
+  const f = FILTERS.find(x => x.id === store.get('filter_' + m, null) && x.mode === m) || FILTERS.find(x => x.mode === m);
+  selectFilter(f);
+}
+function renderFlash(){
+  const b = $('flashBtn'), tag = $('flashTag');
+  b.classList.toggle('off', state.flash === 'off');
+  b.classList.toggle('on', flashOn());
+  tag.textContent = state.flash === 'auto' ? 'A' : state.flash === 'on' ? '' : '×';
+  state.imageDirty = true;
+}
+function renderStampBtn(){ $('dateBtn').classList.toggle('on', state.stamp); drawStampLayer(); }
+function renderCount(){ $('count').textContent = String(Roll.list.length).padStart(2, '0'); }
+function renderThumb(pop){
+  const r = Roll.list[Roll.list.length - 1], t = $('thumb');
+  t.style.backgroundImage = r ? `url(${Roll.url(r)})` : 'none';
+  if (pop){ t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop'); }
+  renderCount();
+}
+function renderSourceUI(){
+  const img = state.source === 'image';
+  $('shutter').classList.toggle('develop', img);
+  $('shutterLbl').textContent = !img ? '' : state.qTotal > 1 ? `REVELAR ${state.qIndex}/${state.qTotal}` : 'REVELAR';
+  $('backBtn').style.display = img ? '' : 'none';
+  $('flipBtn').style.display = img || !state.cameraOK ? 'none' : '';
+  $('fallback').classList.toggle('show', state.source === 'none');
+  frame.style.visibility = state.source === 'none' ? 'hidden' : 'visible';
+}
+
+/* ---------- geometria: recorte e tamanho do visor ---------- */
+function sourceDims(){
+  if (state.source === 'camera') return [video.videoWidth, video.videoHeight];
+  if (state.source === 'image' && state.image) return [state.image.width, state.image.height];
+  return [3, 4];
+}
+function targetAspect(sw, sh){
+  if (state.source === 'image') return sw / sh;          // fotos importadas mantêm a proporção
+  const a = cur().aspect;
+  return sw >= sh ? a : 1 / a;
+}
+function cropFor(sw, sh, a){
+  let cw = sw, ch = sh;
+  if (sw / sh > a) cw = sh * a; else ch = sw / a;
+  return {crop:[(sw - cw) / 2 / sw, (sh - ch) / 2 / sh, cw / sw, ch / sh], cw, ch};
+}
+function layout(force){
+  const [sw, sh] = sourceDims();
+  if (!sw || !sh) return;
+  const a = targetAspect(sw, sh);
+  const st = $('stage').getBoundingClientRect();
+  const key = [sw, sh, a.toFixed(4), Math.round(st.width), Math.round(st.height)].join('|');
+  if (!force && key === state.frameKey) return;
+  state.frameKey = key;
+  const W = st.width - 20, H = st.height - 8;
+  let fw = W, fh = W / a;
+  if (fh > H){ fh = H; fw = H * a; }
+  frame.style.width = Math.floor(fw) + 'px'; frame.style.height = Math.floor(fh) + 'px';
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let pw = Math.round(fw * dpr), ph = Math.round(fh * dpr);
+  const k = Math.min(1, 1600 / Math.max(pw, ph));
+  pw = Math.round(pw * k); ph = Math.round(ph * k);
+  if (view.width !== pw || view.height !== ph){ view.width = pw; view.height = ph; }
+  stampLayer.width = pw; stampLayer.height = ph;
+  drawStampLayer();
+  state.imageDirty = true;
+}
+function drawStampLayer(){
+  const x = stampLayer.getContext('2d');
+  x.clearRect(0, 0, stampLayer.width, stampLayer.height);
+  if (state.stamp && state.source !== 'none') drawStamp(x, stampLayer.width, stampLayer.height, new Date());
+}
+
+/* ---------- visor ---------- */
+function drawPreview(){
+  if (!previewR) return;
+  const [sw, sh] = sourceDims();
+  if (state.source === 'camera'){
+    if (video.readyState < 2 || !sw) return;
+    if (HAS_RVFC && !newFrame && !state.imageDirty) return;   // só redesenha quando a câmara manda um fotograma novo
+    newFrame = false;
+    if (sw !== state.vw || sh !== state.vh){ state.vw = sw; state.vh = sh; layout(true); }
+    previewR.upload(video);
+  } else if (state.source === 'image'){
+    if (!state.imageDirty) return;
+    if (state.imageNew){ previewR.upload(state.image); state.imageNew = false; }
+  } else return;
+  state.imageDirty = false;
+  const {crop, cw, ch} = cropFor(sw, sh, targetAspect(sw, sh));
+  previewR.render(cur(), {
+    w: view.width, h: view.height, crop, cropLong: Math.max(cw, ch),
+    mirror: state.source === 'camera' && state.facing === 'user',
+    seed: state.source === 'camera' ? (frameNo++ % 997) : 1,
+    ev: state.ev, flash: flashOn()
+  });
+}
+const HAS_RVFC = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
+let newFrame = true, frameGen = 0;
+function armFrameCallback(){
+  if (!HAS_RVFC) return;
+  const gen = ++frameGen;
+  const cb = () => { if (gen !== frameGen) return; newFrame = true; video.requestVideoFrameCallback(cb); };
+  video.requestVideoFrameCallback(cb);
+}
+function loop(){
+  drawPreview();
+  requestAnimationFrame(loop);
+}
+
+/* ---------- câmara ---------- */
+async function startCamera(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    throw new Error('Este browser não dá acesso à câmara (precisa de https).');
+  }
+  stopCamera();
+  stream = await navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: {facingMode: {ideal: state.facing}, width: {ideal: 2560}, height: {ideal: 1920}}
+  });
+  video.srcObject = stream;
+  await video.play().catch(() => {});
+  armFrameCallback();
+  track = stream.getVideoTracks()[0];
+  let caps = {};
+  try { caps = track.getCapabilities ? track.getCapabilities() : {}; } catch (e){}
+  torchOK = !!caps.torch;
+  state.cameraOK = true; state.source = 'camera'; state.vw = 0;
+  renderSourceUI();
+}
+function stopCamera(){
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; track = null;
+}
+async function setTorch(on){
+  if (!track) return false;
+  try { await track.applyConstraints({advanced: [{torch: on}]}); return torchOK; } catch (e){ return false; }
+}
+
+/* ---------- disparar / revelar ---------- */
+let audioCtx = null;
+function shutterSound(){
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = audioCtx, t = ctx.currentTime;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.09, ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++){ const k = i / d.length; d[i] = (Math.random() * 2 - 1) * Math.pow(1 - k, 3) * (k < 0.08 || (k > 0.45 && k < 0.55) ? 1 : 0.35); }
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 0.8;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.55, t);
+    src.connect(bp).connect(g).connect(ctx.destination); src.start(t);
+  } catch (e){}
+  try { navigator.vibrate && navigator.vibrate(12); } catch (e){}
+}
+function blink(){
+  const b = $('blink'); b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 70);
+}
+
+async function develop(src, sw, sh, opts){
+  const f = cur();
+  const a = opts.crop ? targetAspect(sw, sh) : sw / sh;
+  const {crop, cw, ch} = cropFor(sw, sh, a);
+  const cap = Math.min(f.cap || 4096, captureR.gl.getParameter(captureR.gl.MAX_TEXTURE_SIZE), 4096);
+  const k = Math.min(1, cap / Math.max(cw, ch));
+  const w = Math.round(cw * k), h = Math.round(ch * k);
+  captureR.canvas.width = w; captureR.canvas.height = h;
+  captureR.upload(src);
+  captureR.render(f, {w, h, crop, cropLong: Math.max(cw, ch), mirror: !!opts.mirror,
+    seed: Math.floor(Math.random() * 900), ev: state.ev, flash: flashOn(), fired: !!opts.fired});
+  const out = document.createElement('canvas'); out.width = w; out.height = h;
+  const x = out.getContext('2d');
+  x.drawImage(captureR.canvas, 0, 0);
+  const now = new Date();
+  if (state.stamp) drawStamp(x, w, h, now);
+  const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', f.id === 'digicam' ? 0.86 : 0.93));
+  const rec = {id: Date.now(), blob, filter: f.id, w, h, t: now.getTime()};
+  await Roll.add(rec);
+  renderThumb(true);
+  return rec;
+}
+
+async function shoot(){
+  if (state.busy) return;
+  if (state.source === 'none'){ $('fileCam').click(); return; }
+  state.busy = true;
+  shutterSound();
+  try {
+    if (state.source === 'image'){
+      const rec = await develop(state.image, state.image.width, state.image.height, {crop: false});
+      if (state.queue.length){
+        state.qIndex++;
+        await loadFile(state.queue.shift(), `Revelada. Agora a ${state.qIndex} de ${state.qTotal}`);
+      } else {
+        state.qTotal = 0;
+        openViewer(Roll.list.indexOf(rec));
+      }
+      return;
+    }
+    const front = state.facing === 'user', useFlash = flashOn();
+    let fired = false;
+    if (useFlash && front){ $('screenFlash').classList.add('on'); await sleep(420); fired = true; }
+    else if (useFlash){ fired = await setTorch(true); if (fired) await sleep(700); }
+    const sw = video.videoWidth, sh = video.videoHeight;
+    // copia já o fotograma para a textura de captura
+    const grab = document.createElement('canvas'); grab.width = sw; grab.height = sh;
+    grab.getContext('2d').drawImage(video, 0, 0, sw, sh);
+    if (front) $('screenFlash').classList.remove('on');
+    if (useFlash && !front) setTorch(false);
+    blink();
+    await develop(grab, sw, sh, {crop: true, mirror: front, fired});
+  } catch (e){
+    console.error(e); toast('Não consegui guardar a foto: ' + e.message);
+  } finally { state.busy = false; }
+}
+
+/* ---------- importar foto ---------- */
+async function loadFile(file, msg){
+  if (!file) return;
+  try {
+    const url = URL.createObjectURL(file);
+    const img = new Image(); img.src = url; await img.decode();
+    const k = Math.min(1, 4096 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);   // respeita a orientação EXIF
+    URL.revokeObjectURL(url);
+    state.image = c; state.imageNew = true; state.imageDirty = true;
+    state.source = 'image'; state.ev = 0;
+    renderSourceUI(); layout(true);
+    toast(msg || 'Escolhe o filtro e carrega em REVELAR');
+  } catch (e){ toast('Não consegui abrir essa imagem'); }
+}
+function pickFiles(list){
+  const files = Array.from(list || []).filter(f => /^image\//.test(f.type) || !f.type);
+  if (!files.length) return;
+  state.queue = files.slice(1); state.qTotal = files.length; state.qIndex = 1;
+  loadFile(files[0], files.length > 1 ? `${files.length} fotos: escolhe o filtro e carrega em REVELAR` : null);
+}
+function backToCamera(){
+  state.image = null; state.queue = []; state.qTotal = 0;
+  state.source = state.cameraOK ? 'camera' : 'none';
+  renderSourceUI(); layout(true); drawStampLayer();
+}
+
+/* ---------- visualizador ---------- */
+let vIndex = -1, downloadsP = null;
+function getDownloads(){
+  if (!downloadsP){
+    downloadsP = (window.claude && typeof window.claude.use === 'function')
+      ? window.claude.use('downloads').catch(() => null)
+      : Promise.resolve(null);
+  }
+  return downloadsP;
+}
+function openViewer(i){
+  if (!Roll.list.length) return;
+  vIndex = Math.max(0, Math.min(i, Roll.list.length - 1));
+  const r = Roll.list[vIndex], f = FILTERS.find(x => x.id === r.filter);
+  $('vImg').src = Roll.url(r);
+  const d = new Date(r.t), p = n => String(n).padStart(2, '0');
+  $('vInfo').textContent = `${(f ? f.name : r.filter).toUpperCase()} · ${p(d.getDate())}.${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())} · ${vIndex + 1}/${Roll.list.length}`;
+  $('vHint').textContent = FRAMED ? 'Também podes manter o dedo na foto e escolher “Guardar imagem”.' : '';
+  $('viewer').classList.add('show');
+}
+async function savePhoto(){
+  const r = Roll.list[vIndex]; if (!r) return;
+  const d = new Date(r.t), p = n => String(n).padStart(2, '0');
+  const name = `rolo_${r.filter}_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.jpg`;
+  if (FRAMED){
+    // dentro do claude.ai: guardar passa pela confirmação da própria app
+    const dl = await getDownloads();
+    if (dl){
+      try { await dl.save({filename: name, data: r.blob}); return; }
+      catch (e){ if (e && e.code === 'declined') return; }
+    }
+    toast('Mantém o dedo na foto → Guardar imagem', 3200); return;
+  }
+  const file = new File([r.blob], name, {type: 'image/jpeg'});
+  if (navigator.canShare && navigator.canShare({files: [file]})){
+    try { await navigator.share({files: [file]}); return; }
+    catch (e){ if (e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a'); a.href = Roll.url(r); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('Foto transferida');
+}
+
+/* ---------- gestos no visor ---------- */
+function gestures(){
+  let sx = 0, sy = 0, ev0 = 0, active = false, vertical = null, lastTap = 0;
+  frame.addEventListener('pointerdown', e => { active = true; sx = e.clientX; sy = e.clientY; ev0 = state.ev; vertical = null; frame.setPointerCapture(e.pointerId); });
+  frame.addEventListener('pointermove', e => {
+    if (!active) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (vertical === null && Math.hypot(dx, dy) > 12) vertical = Math.abs(dy) > Math.abs(dx);
+    if (vertical){
+      state.ev = Math.max(-2, Math.min(2, Math.round((ev0 - dy / 160) * 10) / 10));
+      const p = $('evPill'); p.textContent = (state.ev > 0 ? '+' : state.ev < 0 ? '' : '±') + state.ev.toFixed(1) + ' EV';
+      p.classList.add('show'); clearTimeout(p._t); p._t = setTimeout(() => p.classList.remove('show'), 900);
+      state.imageDirty = true;
+    }
+  });
+  frame.addEventListener('pointerup', e => {
+    if (!active) return; active = false;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (vertical === false && Math.abs(dx) > 50){
+      const list = FILTERS.filter(f => f.mode === state.mode);
+      const i = list.indexOf(cur());
+      selectFilter(list[(i + (dx < 0 ? 1 : -1) + list.length) % list.length]);
+    } else if (vertical === null){
+      const now = Date.now();
+      if (now - lastTap < 300){ state.ev = 0; state.imageDirty = true; toast('Exposição: ±0.0 EV', 1000); }
+      lastTap = now;
+    }
+  });
+  frame.addEventListener('pointercancel', () => { active = false; });
+}
+
+/* ---------- arranque ---------- */
+async function init(){
+  renderModes(); renderChips(); renderFlash(); renderStampBtn();
+  try {
+    previewR = new Renderer(view, false);
+    captureR = new Renderer(document.createElement('canvas'), true);
+  } catch (e){
+    $('fbMsg').textContent = 'Este browser não suporta WebGL2, que a app usa para os filtros.';
+    state.source = 'none'; renderSourceUI(); return;
+  }
+  await Roll.init(); renderThumb(false);
+
+  document.querySelectorAll('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+  $('flashBtn').onclick = () => {
+    state.flash = {auto: 'on', on: 'off', off: 'auto'}[state.flash]; store.set('flash', state.flash); renderFlash();
+    toast('Flash: ' + {auto: 'automático (só nos filtros com flash)', on: 'ligado', off: 'desligado'}[state.flash], 1500);
+  };
+  $('dateBtn').onclick = () => { state.stamp = !state.stamp; store.set('stamp', state.stamp); renderStampBtn(); };
+  $('shutter').onclick = shoot;
+  $('importBtn').onclick = () => $('filePick').click();
+  $('fbPick').onclick = () => $('filePick').click();
+  $('fbShoot').onclick = () => $('fileCam').click();
+  $('fileCam').onchange = e => { pickFiles(e.target.files); e.target.value = ''; };
+  $('filePick').onchange = e => { pickFiles(e.target.files); e.target.value = ''; };
+  $('backBtn').onclick = backToCamera;
+  $('flipBtn').onclick = async () => {
+    state.facing = state.facing === 'user' ? 'environment' : 'user';
+    try { await startCamera(); } catch (e){ toast('Não consegui trocar de câmara'); }
+  };
+  $('thumb').onclick = () => openViewer(Roll.list.length - 1);
+  $('vClose').onclick = () => $('viewer').classList.remove('show');
+  $('vPrev').onclick = () => openViewer(vIndex - 1);
+  $('vNext').onclick = () => openViewer(vIndex + 1);
+  $('vSave').onclick = savePhoto;
+  $('vDel').onclick = async () => {
+    const r = Roll.list[vIndex]; if (!r) return;
+    await Roll.del(r.id); renderThumb(false);
+    if (!Roll.list.length) $('viewer').classList.remove('show'); else openViewer(Math.min(vIndex, Roll.list.length - 1));
+    toast('Foto apagada', 1200);
+  };
+  let vsx = 0;
+  $('vImgWrap').addEventListener('touchstart', e => { vsx = e.touches[0].clientX; }, {passive: true});
+  $('vImgWrap').addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - vsx; if (Math.abs(dx) > 60) openViewer(vIndex + (dx < 0 ? 1 : -1)); });
+  gestures();
+  window.addEventListener('resize', () => layout(false));
+  if (window.ResizeObserver) new ResizeObserver(() => layout(false)).observe($('stage'));
+  video.addEventListener('resize', () => layout(true));
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && state.cameraOK && state.source === 'camera' && (!track || track.readyState === 'ended')){
+      try { await startCamera(); } catch (e){}
+    }
+  });
+
+  try { await startCamera(); }
+  catch (e){
+    state.cameraOK = false; state.source = 'none';
+    $('fbMsg').textContent = !e ? 'Não foi possível abrir a câmara aqui.'
+      : e.name === 'NotAllowedError' ? 'O acesso à câmara foi bloqueado neste ecrã.'
+      : e.name === 'NotFoundError' ? 'Não encontrei nenhuma câmara neste dispositivo.'
+      : e.name === 'NotReadableError' ? 'A câmara está a ser usada por outra app.'
+      : /https|navegador|browser/i.test(e.message) ? e.message
+      : 'Não foi possível abrir a câmara aqui.';
+    renderSourceUI();
+  }
+  layout(true);
+  loop();
+
+  if ('serviceWorker' in navigator && location.protocol === 'https:' && !FRAMED){
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+
+// para testes: aplica um filtro a uma imagem e devolve um blob
+window.ROLO = {FILTERS, state, develop, loadFile, selectFilter, setMode, Roll};
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "Rolo — câmara com filtros",
+  "short_name": "Rolo",
+  "description": "Câmara com filtros de filme, descartável e digicam, para dia e noite.",
+  "lang": "pt-PT",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e0d0c",
+  "theme_color": "#0e0d0c",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
